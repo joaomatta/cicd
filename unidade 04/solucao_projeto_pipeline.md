@@ -4,6 +4,8 @@ O gabarito repete o enunciado de cada questão com formatação diferenciada, e 
 
 Enunciado: Workflow mínimo de Lint como primeiro gate.
 
+> Implemente um workflow de CI acionado em pull requests para a branch principal, contendo um job exclusivo para lint. O job deve fazer checkout do repositório, configurar o Node.js (LTS), instalar dependências com reprodutibilidade e executar o lint.
+
 Resposta: o workflow deve rodar em pull requests para evitar integração de código com violações de padrão. O YAML abaixo cria um job único de lint, com passos reprodutíveis.
 
 Arquivo: .github/workflows/ci.yml
@@ -15,9 +17,6 @@ on:
   pull_request:
     branches: [ main ]
 
-# Permissões padrão restritivas; serão refinadas em questão posterior.
-permissions:
-  contents: read
 
 jobs:
   lint:
@@ -46,6 +45,8 @@ jobs:
 Questão 2 – Resposta
 
 Enunciado: Adição de testes automatizados em job separado e dependência explícita.
+
+> Evolua o workflow criando um job separado para testes automatizados. O job de testes deve depender do sucesso do lint, de forma explícita, usando dependências entre jobs. O aluno deve justificar por que o lint é colocado antes dos testes neste caso.
 
 Resposta: a separação em jobs aumenta clareza e permite evoluções futuras. O needs garante que testes só rodem se lint passar, evitando desperdício de execução quando há falhas triviais de padronização.
 
@@ -98,6 +99,8 @@ Questão 3 – Resposta
 
 Enunciado: Otimização com cache de dependências e redução do tempo de feedback.
 
+> Evolua o workflow para reduzir o tempo total de execução. Aplique cache de dependências do Node, de forma compatível com npm ci, mantendo consistência entre jobs. Explique o que pode dar errado se o cache for configurado de forma inadequada.
+
 Resposta: o cache reduz tempo de download/instalação. A forma mais simples no ecossistema Node é usar o cache embutido do actions/setup-node. O cuidado é alinhar cache com lockfile; mudanças no package-lock.json devem invalidar o cache de forma natural.
 
 Arquivo: .github/workflows/ci.yml (incremento)
@@ -108,9 +111,6 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-
-permissions:
-  contents: read
 
 jobs:
   lint:
@@ -156,6 +156,10 @@ Questão 4 – Resposta
 
 Enunciado: Build de imagem Docker como artefato imutável após gates de qualidade.
 
+> Adicione um job de build de imagem Docker que só execute após lint e testes passarem. A imagem deve ser versionada com tag imutável baseada no SHA do commit. O aluno deve explicar como essa decisão habilita rastreabilidade e promoção do mesmo artefato nos deploys.
+
+
+
 Resposta: o build deve ocorrer somente após gates passarem. A tag github.sha permite rastrear exatamente qual commit gerou a imagem. Essa mesma tag deve ser usada no CD para garantir promoção sem rebuild.
 
 Arquivo: .github/workflows/ci.yml (incremento)
@@ -166,9 +170,6 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-
-permissions:
-  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -227,6 +228,8 @@ Questão 5 – Resposta
 
 Enunciado: Gestão de segredos e princípio do menor privilégio.
 
+> Introduza no pipeline a necessidade de autenticação em um registry privado (ou no GitHub Container Registry). O aluno deve implementar login seguro e explicar como segredos devem ser tratados no GitHub Actions, incluindo escopo (repo vs environment), política de acesso e como evitar vazamento em logs.
+
 Resposta: a autenticação no registry deve usar secrets, nunca valores em texto plano. Em GHCR é comum usar GITHUB_TOKEN, mas ainda assim deve-se restringir permissões e evitar imprimir variáveis em logs. Se a organização usar token dedicado, ele deve ser armazenado como secret de repositório ou, preferencialmente, como secret de environment quando o acesso depender de aprovação.
 
 Arquivo: .github/workflows/ci.yml (incremento)
@@ -236,9 +239,6 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-
-permissions:
-  contents: read
 
 env:
   REGISTRY: ghcr.io
@@ -314,6 +314,8 @@ jobs:
 Questão 6 – Resposta
 
 Enunciado: Permissões mínimas do GITHUB_TOKEN e endurecimento do pipeline.
+
+> Evolua o workflow definindo permissões explícitas e mínimas para o GITHUB_TOKEN, aumentando apenas onde necessário. O aluno deve explicar por que permissões excessivas ampliam a superfície de ataque e como o escopo por job reduz risco.
 
 Resposta: o pipeline deve ser “read-only por padrão” e elevar permissões apenas onde necessário. Isso é especialmente importante quando workflows podem ser disparados por PRs, onde há risco ampliado de execução com código não confiável.
 
@@ -397,6 +399,8 @@ jobs:
 Questão 7 – Resposta
 
 Enunciado: SAST e falha controlada do pipeline para riscos críticos.
+
+> Adicione um job de SAST com CodeQL para JavaScript. O job deve ser parte do gate antes do build/push de imagem. O aluno deve explicar o impacto de inserir segurança como gate “não opcional” e como tratar tempos de execução maiores sem comprometer o feedback.
 
 Resposta: CodeQL entra como gate não opcional antes de build/push, para impedir que vulnerabilidades conhecidas avancem. Como a análise pode ser mais lenta, costuma-se manter lint/test rápidos para feedback inicial e executar SAST em paralelo, mas ainda como requisito para liberar artefato.
 
@@ -503,6 +507,8 @@ Questão 8 – Resposta
 
 Enunciado: Separação CI/CD e promoção por ambiente com aprovação em produção.
 
+> Crie um workflow separado de CD acionado em push na branch principal. Ele deve promover o artefato imutável (tag SHA) para homologação automaticamente e para produção apenas com aprovação manual via environment protegido. O aluno deve explicar por que a separação CI/CD melhora auditoria e por que environments são mais adequados do que “aprovação via script”.
+
 Resposta: o CD deve ser um workflow separado, acionado por push em main, e deve promover o artefato imutável gerado a partir do commit. O uso de environments delega a aprovação para o mecanismo de proteção da plataforma, reduzindo “gambiarras” com scripts e aumentando auditabilidade.
 
 
@@ -555,6 +561,8 @@ Questão 9 – Resposta
 
 Enunciado: Compartilhamento de artefatos e evidências do pipeline.
 
+> Adicione ao CI a publicação de evidências como artefatos de workflow, por exemplo relatórios de teste, coverage ou relatórios de lint. O aluno deve usar upload/download de artefatos para compartilhar dados entre jobs e explicar por que isso melhora diagnóstico e governança.
+
 Resposta: publicar evidências como artefatos permite inspeção pós-execução, facilita auditoria e acelera diagnóstico. O aluno deve configurar o teste para gerar um relatório (por exemplo, JUnit/coverage) e então fazer upload do diretório. O lint também pode produzir relatório em formato consumível.
 
 Arquivo: .github/workflows/ci.yml (incremento exemplificando upload no job de testes)
@@ -596,6 +604,8 @@ Arquivo: .github/workflows/ci.yml (incremento exemplificando upload no job de te
 Questão 10 – Resposta
 
 Enunciado: Generalização com workflows reutilizáveis.
+
+> Refatore parte do pipeline para um workflow reutilizável acionado por workflow_call, permitindo que outros repositórios ou serviços reutilizem a automação sem duplicação. O aluno deve definir inputs e secrets e demonstrar chamada a esse workflow.
 
 Resposta: a reutilização evita duplicação quando a empresa possui múltiplos serviços. O workflow reutilizável define workflow_call, expõe inputs e secrets e centraliza padrões. O workflow chamador passa parâmetros, mantendo governança e consistência.
 
