@@ -59,9 +59,6 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read
-
 jobs:
   lint:
     runs-on: ubuntu-latest
