@@ -1,0 +1,27 @@
+name: "Notify Stakeholders"
+description: "Ação composta para notificar stakeholders via Slack (se configurado) ou email simples."
+inputs:
+  status:
+    description: 'Status da pipeline (success/failure)'
+    required: true
+  message:
+    description: 'Mensagem a ser enviada'
+    required: true
+  slack_webhook:
+    description: 'Webhook do Slack (opcional)'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Notificar via Slack (se webhook disponível)
+      if: "${{ inputs.slack_webhook != '' }}"
+      run: |
+        payload=$(jq -n --arg text "${{ inputs.message }}" '{text: $text}')
+        curl -s -X POST -H 'Content-type: application/json' --data "$payload" "${{ inputs.slack_webhook }}"
+
+    - name: Notificação por fallback (stdout / email)
+      if: "${{ inputs.slack_webhook == '' }}"
+      run: |
+        echo "NOTIFICATION: ${{ inputs.status }} - ${{ inputs.message }}"
+        # Enviar email real pode ser implementado usando um action de terceiros ou servidor SMTP

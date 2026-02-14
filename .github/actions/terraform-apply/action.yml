@@ -1,0 +1,42 @@
+name: "Terraform Apply Composite Action"
+description: "Ação composta para inicializar, validar e aplicar configurações Terraform."
+inputs:
+  tf_dir:
+    description: 'Diretório do Terraform a ser aplicado (ex: terraform/staging)'
+    required: true
+  auto_approve:
+    description: 'Passar --auto-approve? true/false'
+    required: false
+    default: 'true'
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+
+    - name: Terraform Init
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        terraform init -input=false
+
+    - name: Terraform Validate
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        terraform validate || exit 1
+
+    - name: Terraform Plan
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        terraform plan -out=tfplan -input=false || exit 1
+
+    - name: Terraform Apply
+      working-directory: ${{ inputs.tf_dir }}
+      run: |
+        if [ "${{ inputs.auto_approve }}" = 'true' ]; then
+          terraform apply -input=false -auto-approve tfplan || exit 1
+        else
+          terraform apply -input=false tfplan || exit 1
+        fi

@@ -1,0 +1,39 @@
+name: "Publish to AWS ECR"
+description: "Ação composta para autenticar no ECR e publicar imagens Docker."
+inputs:
+  registry:
+    description: 'ECR registry (ex: 123456789012.dkr.ecr.us-east-1.amazonaws.com)'
+    required: true
+  images:
+    description: 'Lista de imagens locais separadas por vírgula (ex: microservice1,microservice2)'
+    required: true
+  region:
+    description: 'Região AWS'
+    required: false
+    default: 'us-east-1'
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ inputs.region }}
+
+    - name: Login to ECR
+      run: |
+        aws ecr get-login-password --region ${{ inputs.region }} | docker login --username AWS --password-stdin ${{ inputs.registry }}
+
+    - name: Tag and Push images
+      run: |
+        IFS=',' read -ra SVCS <<< "${{ inputs.images }}"
+        for s in "${SVCS[@]}"; do
+          s_trim=$(echo "$s" | xargs)
+          echo "Tag e push ${s_trim} -> ${{ inputs.registry }}/${s_trim}:latest"
+          docker tag ${s_trim}:latest ${{ inputs.registry }}/${s_trim}:latest
+          docker push ${{ inputs.registry }}/${s_trim}:latest || exit 1
+        done

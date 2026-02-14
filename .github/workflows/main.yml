@@ -1,0 +1,66 @@
+name: CD - Main (Produção)
+
+on:
+  push:
+    branches: [ 'main' ]
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Executar testes completos
+        uses: ./.github/actions/run-tests
+        with:
+          run_performance: 'false'
+
+      - name: Build imagens
+        uses: ./.github/actions/build-docker
+        with:
+          services: 'microservice1,microservice2'
+
+      - name: Verificar rotação de segredos (30 dias)
+        run: |
+          echo "Verificação de rotação de segredos - placeholder"
+          # Implementar checagem real com AWS Secrets Manager ou Vault
+
+      - name: Publicar imagens no ECR (produção)
+        uses: ./.github/actions/publish-ecr
+        with:
+          registry: ${{ secrets.ECR_REGISTRY }}
+          images: 'microservice1,microservice2'
+          region: 'us-east-1'
+
+      - name: Deploy para produção (Terraform)
+        uses: ./.github/actions/terraform-apply
+        with:
+          tf_dir: 'terraform/production'
+          auto_approve: 'true'
+
+      - name: Rodar testes de smoke pós-deploy
+        run: |
+          echo "Executar verificações de saúde e smoke tests"
+          # Ex.: curl -f https://myapp.example.com/health || exit 1
+
+      - name: Notificar stakeholders - sucesso
+        if: success()
+        uses: ./.github/actions/notify
+        with:
+          status: 'success'
+          message: 'Deploy para produção concluído com sucesso.'
+
+      - name: Notificar stakeholders - falha
+        if: failure()
+        uses: ./.github/actions/notify
+        with:
+          status: 'failure'
+          message: 'Deploy para produção falhou. Iniciando rollback e notificação.'
+
+      - name: Cleanup (sempre)
+        if: always()
+        uses: ./.github/actions/cleanup
+        with:
+          cleanup_tf_dir: 'terraform/staging'

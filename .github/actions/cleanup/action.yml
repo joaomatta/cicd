@@ -1,0 +1,24 @@
+name: "Cleanup Action"
+description: "Ação composta para limpeza sempre executada após pipelines (remoção de imagens locais, destroy de terraform em ambiente de teste se configurado)."
+inputs:
+  cleanup_tf_dir:
+    description: 'Diretório terraform para destruir (opcional)'
+    required: false
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Limpar imagens Docker locais (tentar)
+      run: |
+        set +e
+        images=$(docker images -q)
+        if [ -n "$images" ]; then docker rmi -f $images || true; fi
+        set -e
+
+    - name: Terraform Destroy (opcional)
+      if: "${{ inputs.cleanup_tf_dir != '' }}"
+      run: |
+        echo "Executando terraform destroy em ${{ inputs.cleanup_tf_dir }}"
+        cd ${{ inputs.cleanup_tf_dir }}
+        terraform init -input=false || true
+        terraform destroy -auto-approve || true

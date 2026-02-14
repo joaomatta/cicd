@@ -1,0 +1,61 @@
+name: Tag Release (v*)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  tag-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build and Tests (tag)
+        uses: ./.github/actions/run-tests
+        with:
+          run_performance: 'true'
+
+      - name: Build imagens
+        uses: ./.github/actions/build-docker
+        with:
+          services: 'microservice1,microservice2'
+
+      - name: Publicar docs (placeholder)
+        run: |
+          echo "Gerar e publicar documentação (ex: gh-pages ou S3)"
+
+      - name: Publicar imagens no ECR
+        uses: ./.github/actions/publish-ecr
+        with:
+          registry: ${{ secrets.ECR_REGISTRY }}
+          images: 'microservice1,microservice2'
+          region: 'us-east-1'
+
+      - name: Executar testes de performance adicionais e arquivar resultados
+        run: |
+          ab -n 5000 -c 50 http://staging.myapp.local/ | tee perf-$(date +%s).txt || true
+        continue-on-error: true
+
+      - name: Upload resultados de performance
+        uses: actions/upload-artifact@v4
+        with:
+          name: tag-perf-results
+          path: perf-*.txt
+
+      - name: Atualizar dashboards (placeholder)
+        run: |
+          echo "Atualizando dashboards de monitoramento via API (implementar conforme stack)"
+
+      - name: Notificar stakeholders (tag)
+        uses: ./.github/actions/notify
+        with:
+          status: 'success'
+          message: 'Versão ${GITHUB_REF} publicada e testada.'
+
+      - name: Cleanup (sempre)
+        if: always()
+        uses: ./.github/actions/cleanup
+        with:
+          cleanup_tf_dir: ''

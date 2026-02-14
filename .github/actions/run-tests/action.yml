@@ -1,0 +1,45 @@
+name: "Run Tests Composite Action"
+description: "Ação composta para executar testes unitários, de integração e performance. Inputs permitem controlar execução de testes de performance e serviços alvo."
+inputs:
+  services:
+    description: 'Lista de microserviços (separados por vírgula) para testar. Ex: microservice1,microservice2'
+    required: false
+    default: ''
+  run_performance:
+    description: 'Executar testes de performance (ab)? true/false'
+    required: false
+    default: 'false'
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Instalar dependências (monorepo)
+      run: |
+        # Ajuste conforme gerenciador de pacotes do repositório
+        if [ -f package.json ]; then npm ci; fi
+
+    - name: Testes Unitários
+      run: |
+        echo "Executando testes unitários"
+        if [ -f package.json ]; then npm run test:unit --silent || exit 1; fi
+
+    - name: Testes de Integração
+      run: |
+        echo "Executando testes de integração"
+        if [ -f package.json ]; then npm run test:integration --silent || exit 1; fi
+
+    - name: Testes de Performance (Apache Bench)
+      if: "${{ inputs.run_performance == 'true' }}"
+      run: |
+        echo "Executando ab - ajustar URL conforme ambiente"
+        ab -n 1000 -c 10 http://localhost:3000/ | tee ab-report-$(date +%s).txt || true
+
+    - name: Upload resultados de performance (artifact)
+      if: "${{ inputs.run_performance == 'true' }}"
+      uses: actions/upload-artifact@v4
+      with:
+        name: perf-results
+        path: |
+          ab-report-*.txt

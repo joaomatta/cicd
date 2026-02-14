@@ -1,0 +1,55 @@
+name: CI/CD - Release
+
+on:
+  push:
+    branches: [ 'release' ]
+
+jobs:
+  release-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Tests (inclui performance opcional)
+        uses: ./.github/actions/run-tests
+        with:
+          run_performance: 'false'
+
+      - name: Provisionar infraestrutura com Terraform (staging/release)
+        uses: ./.github/actions/terraform-apply
+        with:
+          tf_dir: 'terraform/staging'
+          auto_approve: 'true'
+
+      - name: Build Docker images
+        uses: ./.github/actions/build-docker
+        with:
+          services: 'microservice1,microservice2'
+
+      - name: Publicar imagens no ECR
+        uses: ./.github/actions/publish-ecr
+        with:
+          registry: ${{ secrets.ECR_REGISTRY }}
+          images: 'microservice1,microservice2'
+          region: 'us-east-1'
+
+      - name: Notificar sucesso (release)
+        if: success()
+        uses: ./.github/actions/notify
+        with:
+          status: 'success'
+          message: 'Release pipeline finalizado com sucesso.'
+
+      - name: Notificar falha (release)
+        if: failure()
+        uses: ./.github/actions/notify
+        with:
+          status: 'failure'
+          message: 'Release pipeline falhou. Revertendo se necessário.'
+
+      - name: Cleanup (sempre)
+        if: always()
+        uses: ./.github/actions/cleanup
+        with:
+          cleanup_tf_dir: ''

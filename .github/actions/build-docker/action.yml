@@ -1,0 +1,28 @@
+name: "Build Docker Images"
+description: "Ação composta para construir imagens Docker para os microserviços listados."
+inputs:
+  services:
+    description: 'Lista de microserviços separados por vírgula. Ex: microservice1,microservice2'
+    required: true
+    default: ''
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Construir imagens Docker
+      run: |
+        IFS=',' read -ra SVCS <<< "${{ inputs.services }}"
+        for s in "${SVCS[@]}"; do
+          s_trim=$(echo "$s" | xargs)
+          if [ -d "$s_trim" ]; then
+            echo "Construindo $s_trim"
+            docker build -t ${s_trim}:latest ./$s_trim || exit 1
+          else
+            echo "Pasta $s_trim não encontrada, pulando"
+          fi
+        done

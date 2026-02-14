@@ -1,0 +1,58 @@
+name: CI - Develop
+
+on:
+  push:
+    branches: [ 'develop' ]
+  pull_request:
+    branches: [ 'develop' ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verificar rotação de segredos (placeholder)
+        run: |
+          echo "Checar rotação de segredos (implementar verificação via AWS Secrets Manager ou Vault)."
+          # Exemplo: aws secretsmanager describe-secret --secret-id my/secret | jq .LastRotatedDate
+
+      - name: Run Tests
+        uses: ./.github/actions/run-tests
+        with:
+          run_performance: 'false'
+
+      - name: Build Docker images
+        uses: ./.github/actions/build-docker
+        with:
+          services: 'microservice1,microservice2'
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images-placeholder
+          path: |
+            .
+
+      - name: Notificar sucesso (develop)
+        if: success()
+        uses: ./.github/actions/notify
+        with:
+          status: 'success'
+          message: 'Build em develop concluído com sucesso.'
+
+      - name: Notificar falha (develop)
+        if: failure()
+        uses: ./.github/actions/notify
+        with:
+          status: 'failure'
+          message: 'Pipeline em develop falhou. Verificar logs.'
+
+      - name: Limpeza (sempre)
+        if: always()
+        uses: ./.github/actions/cleanup
+        with:
+          cleanup_tf_dir: ''
